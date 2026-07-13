@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Page</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body,
+        html {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #e6e6e6;
+            color: #000000;
+        }
+
+        .crt-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.03) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 99999;
+            animation: crt-flicker 0.15s infinite;
+        }
+
+        @keyframes crt-flicker {
+            0% {
+                opacity: 0.99;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0.995;
+            }
+        }
+
+        #boot-screen {
+            position: fixed;
+            inset: 0;
+            background-color: #000000;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loading-container {
+            width: 60px;
+            height: 60px;
+            position: relative;
+            margin-bottom: 30px;
+        }
+
+        .loading-ring {
+            box-sizing: border-box;
+            display: block;
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            border: 6px solid #ff0000;
+            border-radius: 50%;
+            animation: loading-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+            border-color: #ff0000 transparent transparent transparent;
+        }
+
+        @keyframes loading-ring {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .boot-text {
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: #ffffff;
+            text-transform: uppercase;
+        }
+
+        #desktop {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background-color: #e6e6e6;
+            background-image: radial-gradient(rgba(0, 0, 0, 0.15) 1.5px, transparent 1.5px);
+            background-size: 20px 20px;
+            opacity: 0;
+            transition: opacity 0.3s ease-in;
+        }
+
+        .window {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.25);
+            border: none;
+            border-radius: 6px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25);
+            width: 360px;
+            display: flex;
+            flex-direction: column;
+            transform: scale(0);
+            opacity: 0;
+            transition: transform 0.38s cubic-bezier(0.19, 1, 0.22, 1), opacity 0.38s;
+        }
+
+        .window.spawned {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .window.dragging {
+            transition: none !important;
+        }
+
+        .win-header {
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(0, 0, 0, 0.15) 50%, rgba(255, 255, 255, 0.1) 100%);
+            padding: 6px 10px;
+            font-size: 13px;
+            font-weight: bold;
+            color: #ffffff;
+            text-shadow: 0px 1px 2px rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: grab;
+            border-radius: 6px 6px 0 0;
+            height: 32px;
+        }
+
+        .win-header:active {
+            cursor: grabbing;
+        }
+
+        .win-title {
+            flex-grow: 1;
+            pointer-events: none;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            padding-right: 10px;
+            letter-spacing: 1px;
+        }
+
+        .win-controls {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .win-btn.min {
+            background: linear-gradient(to bottom, #dce6f2 0%, #b0c9e6 50%, #90b3dd 54%, #a5c3e8 100%);
+            color: #1e395b;
+            width: 26px;
+            height: 18px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding-bottom: 2px;
+            font-size: 11px;
+            font-weight: bold;
+            border: 1px solid rgba(0, 0, 0, 0.3);
+            border-radius: 2px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 1px rgba(0, 0, 0, 0.15);
+            cursor: pointer;
+        }
+
+        .win-btn.min:hover {
+            background: linear-gradient(to bottom, #eef5fc 0%, #cce2f7 50%, #a2cbf2 54%, #bfe0fb 100%);
+            border-color: #3c7fb1;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 0 5px rgba(82, 168, 236, 0.8);
+        }
+
+        .win-btn.min:active {
+            background: linear-gradient(to bottom, #a2cbf2 0%, #72aade 50%, #468ac4 54%, #70aada 100%);
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+        }
+
+        .win-content {
+            padding: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #111111;
+            background: #ffffff;
+            flex-grow: 1;
+            overflow-y: auto;
+            border-radius: 0 0 6px 6px;
+        }
+
+        .win-content strong {
+            font-size: 17px;
+            display: block;
+            margin-bottom: 12px;
+            color: #ff0000;
+            border-bottom: 2px solid #e6e6e6;
+            padding-bottom: 6px;
+            letter-spacing: 1px;
+        }
+
+        a.win-link {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 6px 16px;
+            background: linear-gradient(to bottom, #f4f4f4 0%, #e4e4e4 50%, #d4d4d4 50%, #c4c4c4 100%);
+            color: #1e395b;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 12px;
+            border: 1px solid rgba(0, 0, 0, 0.45);
+            border-radius: 3px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 1px 2px rgba(0, 0, 0, 0.15);
+            transition: all 0.1s;
+            text-transform: none;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        a.win-link:hover {
+            background: linear-gradient(to bottom, #fcfcfc 0%, #e2f1fc 50%, #cde6f7 50%, #b9daf2 100%);
+            border-color: #3c7fb1;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 0 5px rgba(82, 168, 236, 0.6);
+            color: #1e395b;
+        }
+
+        a.win-link:active {
+            background: linear-gradient(to bottom, #cde6f7 0%, #b3d7f2 50%, #99c9eb 50%, #7db9e3 100%);
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        .links-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .links-grid a.win-link {
+            margin-top: 0;
+            text-align: center;
+            width: 100%;
+        }
+
+        #taskbar {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            height: 48px;
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            gap: 6px;
+            z-index: 99999;
+        }
+
+        .tb-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.75);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .tb-icon:hover {
+            background: #ffffff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        .tb-icon::before {
+            content: attr(data-title);
+            position: absolute;
+            bottom: 46px;
+            left: 50%;
+            transform: translateX(-50%) translateY(5px);
+            background: rgba(0, 0, 0, 0.85);
+            color: #ffffff;
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: 4px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            letter-spacing: 0.5px;
+        }
+
+        .tb-icon:hover::before {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .tb-indicator {
+            position: absolute;
+            bottom: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 6px;
+            height: 3px;
+            background: #ff0000;
+            border-radius: 2px;
+            transition: all 0.2s;
+        }
+
+        .tb-icon.minimized {
+            opacity: 0.65;
+        }
+
+        .tb-icon.minimized .tb-indicator {
+            width: 3px;
+            background: #888888;
+        }
+
+        .steam-profile-widget {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 12px 18px;
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            border-radius: 6px;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15);
+            color: #1e395b;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-width: 270px;
+            transition: all 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+        .steam-profile-widget:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(255, 68, 0, 0.15);
+            border-color: rgba(255, 68, 0, 0.4);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .steam-avatar-container {
+            position: relative;
+            width: 58px;
+            height: 58px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .steam-avatar-border {
+            position: absolute;
+            inset: -3px;
+            border-radius: 50%;
+            padding: 3px;
+            background: conic-gradient(from 0deg, #ff3300, #ff9900, #ff3300);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            animation: steam-spin 3s linear infinite, steam-fire 1.5s ease-in-out infinite alternate;
+            pointer-events: none;
+        }
+
+        @keyframes steam-spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes steam-fire {
+            0% {
+                filter: drop-shadow(0 0 3px #ff3300) drop-shadow(0 0 6px #ff9900);
+            }
+
+            100% {
+                filter: drop-shadow(0 0 6px #ff3300) drop-shadow(0 0 12px #ffaa00) saturate(1.8);
+            }
+        }
+
+        .steam-avatar-pic {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(5px);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .steam-avatar-pic img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .steam-profile-details {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+
+        .steam-name {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1e395b;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+
+        .steam-game {
+            font-size: 11px;
+            color: #a34f21;
+            font-weight: 600;
+        }
+
+        @media (max-width: 600px) {
+            .steam-profile-widget {
+                top: 10px;
+                right: 10px;
+                min-width: auto;
+                width: calc(100% - 20px);
+                padding: 10px 14px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="crt-overlay"></div>
+
+    <div id="boot-screen">
+        <div class="loading-container">
+            <div class="loading-ring"></div>
+        </div>
+        <div class="boot-text">INITIALIZING Page...</div>
+    </div>
+
+    <div id="desktop">
+        <div class="steam-profile-widget">
+            <div class="steam-avatar-container">
+                <div class="steam-avatar-border"></div>
+                <div class="steam-avatar-pic">
+                    <img src="https://raw.githubusercontent.com/scod-me/scod.github.io/refs/heads/main/meprofile.jpg"
+                        alt="Profile Picture">
+                </div>
+            </div>
+            <div class="steam-profile-details">
+                <span class="steam-name">ScodDev</span>
+                <span class="steam-game">Welcome to my page</span>
+            </div>
+        </div>
+        <div id="taskbar">
+            <div id="taskbar-items" style="display:flex; gap:6px;"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const bootScreen = document.getElementById("boot-screen");
+            const desktop = document.getElementById("desktop");
+            const taskbarItems = document.getElementById("taskbar-items");
+
+            setTimeout(() => {
+                bootScreen.style.transition = "opacity 0.5s ease";
+                bootScreen.style.opacity = 0;
+                setTimeout(() => {
+                    bootScreen.style.display = "none";
+                    desktop.style.opacity = "1";
+                    initWindows();
+                }, 500);
+            }, 2500);
+
+            const windowsData = [
+                {
+                    id: "about",
+                    title: "SYS_INFO.EXE",
+                    icon: "ℹ️",
+                    x: window.innerWidth / 2 - 400,
+                    y: 100,
+                    content: "<strong>GAME DEVELOPER</strong>I make multiplayer or single player games."
+                },
+                {
+                    id: "skills",
+                    title: "SKILLS.DLL",
+                    icon: "🛠️",
+                    x: window.innerWidth / 2 + 100,
+                    y: 80,
+                    content: "<strong>CORE SKILLS</strong>- Unity 6<br>- Godot 4"
+                },
+                {
+                    id: "project1",
+                    title: "MULTIPLAYER.BIN",
+                    icon: "🎮",
+                    x: window.innerWidth / 2 - 350,
+                    y: 350,
+                    content: "<strong>PROJECT</strong>coming soon..."
+                },
+                {
+                    id: "project2",
+                    title: "SANDBOX.BAT",
+                    icon: "📦",
+                    x: window.innerWidth / 2 + 50,
+                    y: 380,
+                    content: "<strong>EXPERIMENTAL</strong>coming soon..."
+                },
+                {
+                    id: "contact",
+                    title: "NETWORK.SYS",
+                    icon: "🔗",
+                    x: window.innerWidth / 2 - 150,
+                    y: 550,
+                    content: "<strong>CONNECTION </strong>System access granted.<div class='links-grid'><a href='https://www.youtube.com/@ScodDev' target='_blank' rel='noopener noreferrer' class='win-link'>YOUTUBE</a><a href='https://www.reddit.com/user/scodjpg/' target='_blank' rel='noopener noreferrer' class='win-link'>REDDIT</a><a href='https://x.com/scodpng' target='_blank' rel='noopener noreferrer' class='win-link'>X</a><a href='https://discord.gg/AJbZ4qWK' target='_blank' rel='noopener noreferrer' class='win-link'>DISCORD</a><a href='https://scod.itch.io/' target='_blank' rel='noopener noreferrer' class='win-link'>ITCH.IO</a><a href='https://store.steampowered.com/' target='_blank' rel='noopener noreferrer' class='win-link'>STEAM</a></div>"
+                }
+            ];
+
+            let highestZ = 10;
+            let activeWindow = null;
+            let startX, startY, initialX, initialY;
+            let lastMouseX = 0;
+            let lastMouseY = 0;
+            let skewX = 0;
+            let skewY = 0;
+
+            document.addEventListener("mousemove", (e) => {
+                if (!activeWindow) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+
+                activeWindow.style.left = `${initialX + dx}px`;
+                activeWindow.style.top = `${initialY + dy}px`;
+
+                const vx = e.clientX - lastMouseX;
+                const vy = e.clientY - lastMouseY;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+
+                const targetSkewX = -vx * 0.45;
+                const targetSkewY = vy * 0.25;
+
+                skewX += (targetSkewX - skewX) * 0.3;
+                skewY += (targetSkewY - skewY) * 0.3;
+
+                const clampedSkewX = Math.max(-25, Math.min(25, skewX));
+                const clampedSkewY = Math.max(-15, Math.min(15, skewY));
+
+                activeWindow.style.transformOrigin = "center top";
+                activeWindow.style.transform = `skewX(${clampedSkewX}deg) skewY(${clampedSkewY}deg) scale(${1 + Math.abs(clampedSkewX) * 0.006})`;
+            });
+
+            document.addEventListener("mouseup", () => {
+                if (activeWindow) {
+                    activeWindow.classList.remove("dragging");
+                    activeWindow.style.transform = "";
+                    activeWindow = null;
+                }
+            });
+
+            function initWindows() {
+                windowsData.forEach((data, index) => {
+                    setTimeout(() => {
+                        createWindow(data);
+                    }, index * 150);
+                });
+            }
+
+            function updateActiveWindow() {
+                const activeWins = Array.from(document.querySelectorAll(".window.spawned:not(.minimized)"));
+                if (activeWins.length === 0) {
+                    Array.from(taskbarItems.children).forEach(el => el.classList.remove("active"));
+                    return;
+                }
+
+                let topWin = activeWins[0];
+                let maxZ = parseInt(topWin.style.zIndex) || 0;
+                for (let i = 1; i < activeWins.length; i++) {
+                    const z = parseInt(activeWins[i].style.zIndex) || 0;
+                    if (z > maxZ) {
+                        maxZ = z;
+                        topWin = activeWins[i];
+                    }
+                }
+
+                Array.from(taskbarItems.children).forEach(el => el.classList.remove("active"));
+                const activeIcon = document.querySelector(`.tb-icon[data-id="${topWin.id}"]`);
+                if (activeIcon) {
+                    activeIcon.classList.add("active");
+                }
+            }
+
+            function createWindow(data) {
+                const win = document.createElement("div");
+                win.className = "window";
+                win.id = data.id;
+                win.style.left = `${data.x}px`;
+                win.style.top = `${data.y}px`;
+                win.style.zIndex = highestZ;
+
+                const header = document.createElement("div");
+                header.className = "win-header";
+
+                const title = document.createElement("span");
+                title.className = "win-title";
+                title.innerText = data.title;
+
+                const controls = document.createElement("div");
+                controls.className = "win-controls";
+
+                const minBtn = document.createElement("div");
+                minBtn.className = "win-btn min";
+                minBtn.innerText = "—";
+
+                controls.appendChild(minBtn);
+                header.appendChild(title);
+                header.appendChild(controls);
+
+                const content = document.createElement("div");
+                content.className = "win-content";
+                content.innerHTML = data.content;
+
+                win.appendChild(header);
+                win.appendChild(content);
+                desktop.appendChild(win);
+
+                const tbIcon = document.createElement("div");
+                tbIcon.className = "tb-icon";
+                tbIcon.setAttribute("data-title", data.title);
+                tbIcon.setAttribute("data-id", data.id);
+                tbIcon.innerText = data.icon;
+
+                const tbIndicator = document.createElement("div");
+                tbIndicator.className = "tb-indicator";
+                tbIcon.appendChild(tbIndicator);
+                taskbarItems.appendChild(tbIcon);
+
+                setTimeout(() => {
+                    win.classList.add("spawned");
+                    bringToFront();
+                }, 10);
+
+                const bringToFront = () => {
+                    if (win.style.zIndex != highestZ) {
+                        highestZ++;
+                        win.style.zIndex = highestZ;
+                    }
+                    Array.from(taskbarItems.children).forEach(el => el.classList.remove("active"));
+                    tbIcon.classList.add("active");
+                };
+
+                const minimizeWin = () => {
+                    const iconRect = tbIcon.getBoundingClientRect();
+                    const winRect = win.getBoundingClientRect();
+                    const dx = (iconRect.left + iconRect.width / 2) - (winRect.left + winRect.width / 2);
+                    const dy = (iconRect.top + iconRect.height / 2) - (winRect.top + winRect.height / 2);
+
+                    win.classList.add("minimized");
+                    win.style.transform = `translate(${dx}px, ${dy}px) scale(0.05)`;
+                    win.style.opacity = "0";
+
+                    tbIcon.classList.add("minimized");
+                    tbIcon.classList.remove("active");
+
+                    updateActiveWindow();
+                };
+
+                const restoreWin = () => {
+                    win.classList.remove("minimized");
+                    win.style.transform = "";
+                    win.style.opacity = "";
+
+                    tbIcon.classList.remove("minimized");
+                    bringToFront();
+                };
+
+                header.addEventListener("mousedown", (e) => {
+                    if (e.target.classList.contains("win-btn")) return;
+                    if (win.classList.contains("minimized")) return;
+
+                    e.preventDefault();
+                    bringToFront();
+                    activeWindow = win;
+                    win.classList.add("dragging");
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    lastMouseX = e.clientX;
+                    lastMouseY = e.clientY;
+                    initialX = win.offsetLeft;
+                    initialY = win.offsetTop;
+                    skewX = 0;
+                    skewY = 0;
+                });
+
+                win.addEventListener("mousedown", bringToFront);
+
+                minBtn.addEventListener("mousedown", (e) => {
+                    e.stopPropagation();
+                    minimizeWin();
+                });
+
+                tbIcon.addEventListener("mousedown", () => {
+                    if (win.classList.contains("minimized")) {
+                        restoreWin();
+                    } else if (tbIcon.classList.contains("active")) {
+                        minimizeWin();
+                    } else {
+                        bringToFront();
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>
